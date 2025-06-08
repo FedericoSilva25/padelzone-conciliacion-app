@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body {% if message %}data-message="{{ message | tojson | safe }}"{% endif %}>
+<body {% if message %}data-message="{{ message | safe }}"{% endif %}>
     <header>
         <img src="{{ url_for('static', filename='padelzone-removebg-preview.png') }}" alt="Logo Padelzone" class="logo">
         <h1>Conciliación Automática de Ventas y Banco</h1>
@@ -77,6 +77,13 @@
                 }
             } catch (e) {
                 console.error("Error al parsear el mensaje JSON:", e);
+                // Si el JSON es inválido, puedes mostrar un SweetAlert de error genérico
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error interno',
+                    text: 'Hubo un problema al mostrar el mensaje. Por favor, recargue la página.',
+                    showConfirmButton: true
+                });
             }
         }
     </script>

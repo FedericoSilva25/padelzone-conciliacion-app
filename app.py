@@ -2,9 +2,12 @@ import pandas as pd
 from flask import Flask, request, render_template, redirect, url_for, session
 from datetime import timedelta
 import os
+import json # Importar el módulo json
 
 app = Flask(__name__)
-app.secret_key = 'super_secreto_para_sesiones_seguras' # ¡Cambia esto por una clave secreta fuerte!
+# ¡IMPORTANTE! Cambia esta clave secreta por una cadena larga, aleatoria y segura.
+# En producción, obtén esto de una variable de entorno como se explica en los pasos de Render.
+app.secret_key = os.environ.get('SECRET_KEY', 'una_clave_secreta_por_defecto_muy_segura_para_desarrollo')
 
 # Configuración de la carpeta para guardar archivos temporales
 UPLOAD_FOLDER = 'uploads'
@@ -106,14 +109,16 @@ def conciliar_ventas_banco(df_ventas, df_banco):
 def index():
     if request.method == 'POST':
         if 'ventas_file' not in request.files or 'banco_file' not in request.files:
-            session['message'] = {'type': 'error', 'text': 'Ambos archivos son requeridos.'}
+            # Serializar el mensaje de error directamente aquí
+            session['message'] = json.dumps({'type': 'error', 'text': 'Ambos archivos son requeridos.'})
             return redirect(request.url)
 
         ventas_file = request.files['ventas_file']
         banco_file = request.files['banco_file']
 
         if ventas_file.filename == '' or banco_file.filename == '':
-            session['message'] = {'type': 'error', 'text': 'Ambos archivos son requeridos.'}
+            # Serializar el mensaje de error directamente aquí
+            session['message'] = json.dumps({'type': 'error', 'text': 'Ambos archivos son requeridos.'})
             return redirect(request.url)
 
         if ventas_file and banco_file:
@@ -134,16 +139,19 @@ def index():
                 ventas_no_conciliadas_html = df_ventas_no_conciliadas.to_html(classes='table table-striped table-bordered', index=False) if not df_ventas_no_conciliadas.empty else "<p>Todas las ventas se conciliaron o no hay ventas después de los filtros.</p>"
                 banco_no_conciliado_html = df_banco_no_conciliado.to_html(classes='table table-striped table-bordered', index=False) if not df_banco_no_conciliado.empty else "<p>Todos los ingresos bancarios se conciliaron o no hay ingresos bancarios.</p>"
 
-                session['message'] = {'type': 'success', 'text': 'Conciliación realizada con éxito!'}
+                # Serializar el mensaje de éxito directamente aquí
+                session['message'] = json.dumps({'type': 'success', 'text': 'Conciliación realizada con éxito!'})
 
                 return render_template('index.html',
                                        conciliado=conciliado_html,
                                        ventas_no_conciliadas=ventas_no_conciliadas_html,
                                        banco_no_conciliado=banco_no_conciliado_html,
-                                       message=session.pop('message', None) # Limpiar mensaje después de usarlo
+                                       # message=session.pop('message', None)  <-- 'message' ya está en session, no lo pop aquí
+                                       # Simplemente se pasa a la plantilla y se limpia en el JavaScript
                                        )
             except Exception as e:
-                session['message'] = {'type': 'error', 'text': f'Error al procesar los archivos: {e}'}
+                # Serializar el mensaje de error directamente aquí
+                session['message'] = json.dumps({'type': 'error', 'text': f'Error al procesar los archivos: {str(e)}'})
                 print(f"Error: {e}") # Para depuración en la consola
                 return redirect(request.url)
             finally:
@@ -153,7 +161,11 @@ def index():
                 if os.path.exists(banco_filepath):
                     os.remove(banco_filepath)
 
-    return render_template('index.html', message=session.pop('message', None))
+    # Para la carga inicial de la página o después de un redirect, obtenemos el mensaje de la sesión
+    # y lo pasamos a la plantilla. Si no hay, será None.
+    # El JavaScript se encargará de leerlo del atributo data-message del body.
+    message_from_session = session.pop('message', None)
+    return render_template('index.html', message=message_from_session)
 
 if __name__ == '__main__':
     app.run(debug=True) # debug=True permite ver cambios sin reiniciar el servidor y recargar errores
