@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conciliación Automática Padelzone</title>
+    <link rel="icon" href="{{ url_for('static', filename='padelzone-removebg-preview.png') }}" type="image/png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body {% if message %}data-message="{{ message | tojson | safe }}"{% endif %}>
+    <header>
+        <img src="{{ url_for('static', filename='padelzone-removebg-preview.png') }}" alt="Logo Padelzone" class="logo">
+        <h1>Conciliación Automática de Ventas y Banco</h1>
+    </header>
+
+    <main>
+        <p class="description">Sube tus archivos CSV de ventas y de ingresos bancarios para conciliar automáticamente. Se ignorarán las ventas de "ACADEMIA AMATEUR", "ACADEMIA PRO" y las ventas canceladas. La conciliación permite hasta 24 horas de diferencia en la fecha.</p>
+
+        <form method="POST" enctype="multipart/form-data" class="upload-form">
+            <div class="form-group">
+                <label for="ventas_file">Archivo de Ventas (CSV):</label>
+                <input type="file" name="ventas_file" id="ventas_file" accept=".csv" required class="form-control-file">
+            </div>
+            <div class="form-group">
+                <label for="banco_file">Archivo de Banco (CSV):</label>
+                <input type="file" name="banco_file" id="banco_file" accept=".csv" required class="form-control-file">
+            </div>
+            <button type="submit" class="btn-submit">Conciliar</button>
+        </form>
+
+        <hr>
+
+        <section class="results">
+            <h2>Resultados de la Conciliación</h2>
+
+            <h3>Transacciones Conciliadas</h3>
+            <div class="table-responsive">
+                {{ conciliado | safe }}
+            </div>
+
+            <h3>Ventas No Conciliadas</h3>
+            <div class="table-responsive">
+                {{ ventas_no_conciliadas | safe }}
+            </div>
+
+            <h3>Ingresos Bancarios No Conciliados</h3>
+            <div class="table-responsive">
+                {{ banco_no_conciliado | safe }}
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Padelzone. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Lógica para mostrar SweetAlert2
+        const body = document.querySelector('body');
+        const messageData = body.dataset.message; // Leer el atributo data-message
+
+        if (messageData) {
+            try {
+                const message = JSON.parse(messageData); // Parsear la cadena JSON a un objeto JavaScript
+                if (message && message.type) {
+                    Swal.fire({
+                        icon: message.type,
+                        title: message.type === 'success' ? '¡Éxito!' : 'Error',
+                        text: message.text,
+                        timer: 4000,
+                        timerProgressBar: true,
+                        showConfirmButton: false
+                    });
+                }
+            } catch (e) {
+                console.error("Error al parsear el mensaje JSON:", e);
+            }
+        }
+    </script>
+</body>
+</html>
