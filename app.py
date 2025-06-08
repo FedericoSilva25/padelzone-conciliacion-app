@@ -6,8 +6,9 @@ import json # Importar el módulo json
 
 app = Flask(__name__)
 # ¡IMPORTANTE! Cambia esta clave secreta por una cadena larga, aleatoria y segura.
-# En producción, obtén esto de una variable de entorno como se explica en los pasos de Render.
-app.secret_key = os.environ.get('SECRET_KEY', 'una_clave_secreta_por_defecto_muy_segura_para_desarrollo')
+# En producción, obtén esto de una variable de entorno en Render.
+# Por ejemplo, puedes generar una con: os.urandom(24).hex()
+app.secret_key = os.environ.get('SECRET_KEY', 'una_clave_secreta_muy_segura_para_desarrollo_local_1234567890abcdef')
 
 # Configuración de la carpeta para guardar archivos temporales
 UPLOAD_FOLDER = 'uploads'
@@ -145,12 +146,11 @@ def index():
                 return render_template('index.html',
                                        conciliado=conciliado_html,
                                        ventas_no_conciliadas=ventas_no_conciliadas_html,
-                                       banco_no_conciliado=banco_no_conciliado_html,
-                                       # message=session.pop('message', None)  <-- 'message' ya está en session, no lo pop aquí
-                                       # Simplemente se pasa a la plantilla y se limpia en el JavaScript
+                                       banco_no_conciliado=banco_no_conciliado_html
                                        )
             except Exception as e:
                 # Serializar el mensaje de error directamente aquí
+                # Convertimos 'e' a string para asegurar que no haya caracteres que rompan el JSON
                 session['message'] = json.dumps({'type': 'error', 'text': f'Error al procesar los archivos: {str(e)}'})
                 print(f"Error: {e}") # Para depuración en la consola
                 return redirect(request.url)

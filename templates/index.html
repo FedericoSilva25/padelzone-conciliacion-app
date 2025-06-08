@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body {% if message %}data-message="{{ message | safe }}"{% endif %}>
+<body {% if message %}data-message="{{ message | e }}"{% endif %}>
     <header>
         <img src="{{ url_for('static', filename='padelzone-removebg-preview.png') }}" alt="Logo Padelzone" class="logo">
         <h1>Conciliación Automática de Ventas y Banco</h1>
@@ -64,7 +64,10 @@
 
         if (messageData) {
             try {
-                const message = JSON.parse(messageData); // Parsear la cadena JSON a un objeto JavaScript
+                // Parsear la cadena JSON a un objeto JavaScript.
+                // Como el mensaje ya ha sido json.dumps en Python y escapado como HTML,
+                // messageData debe ser una cadena JSON válida aquí.
+                const message = JSON.parse(messageData);
                 if (message && message.type) {
                     Swal.fire({
                         icon: message.type,
@@ -77,11 +80,12 @@
                 }
             } catch (e) {
                 console.error("Error al parsear el mensaje JSON:", e);
-                // Si el JSON es inválido, puedes mostrar un SweetAlert de error genérico
+                // Si el JSON es inválido, mostramos un SweetAlert de error genérico.
+                // Esto indica que el problema es en la serialización o el atributo HTML.
                 Swal.fire({
                     icon: 'error',
                     title: 'Error interno',
-                    text: 'Hubo un problema al mostrar el mensaje. Por favor, recargue la página.',
+                    text: 'Hubo un problema al mostrar el mensaje. Por favor, recargue la página o contacte a soporte.',
                     showConfirmButton: true
                 });
             }
