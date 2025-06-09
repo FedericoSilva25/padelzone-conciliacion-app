@@ -2,7 +2,7 @@ import pandas as pd
 from flask import Flask, request, render_template, redirect, url_for, session
 from datetime import timedelta
 import os
-import json
+import json # Importar el módulo json
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'una_clave_secreta_muy_segura_para_desarrollo_local_1234567890abcdef')
@@ -21,45 +21,54 @@ def conciliar_ventas_banco(df_ventas, df_banco):
 
     # --- INICIO DE LA SOLUCIÓN: ESTANDARIZAR NOMBRES DE COLUMNAS AL PRINCIPIO ---
     # Limpiar espacios en blanco de los nombres de las columnas y convertirlos a minúsculas
-    # Esto asegura que 'Fecha ' o 'FECHA' o ' fecha' se conviertan a 'fecha'
     df_ventas.columns = df_ventas.columns.str.strip().str.lower()
     df_banco.columns = df_banco.columns.str.strip().str.lower()
-
-    # Ahora, todas las referencias a las columnas en la función conciliar_ventas_banco
-    # deben usar los nombres en minúscula (ej. 'fecha', 'monto', 'cliente', 'cancelado')
     # --- FIN DE LA SOLUCIÓN ---
 
     # Asegurarse de que las columnas existen antes de filtrar
     # Los nombres de las columnas ahora son en minúsculas
-    if 'cliente' not in df_ventas.columns: # Cambiado a 'cliente'
+    if 'cliente' not in df_ventas.columns:
         print("Advertencia: La columna 'cliente' no se encontró en el archivo de ventas. No se aplicará el filtro por cliente.")
         df_ventas_filtradas = df_ventas.copy()
-    elif 'cancelado' not in df_ventas.columns: # Cambiado a 'cancelado'
+    elif 'cancelado' not in df_ventas.columns:
         print("Advertencia: La columna 'cancelado' no se encontró en el archivo de ventas. No se aplicará el filtro por cancelado.")
         df_ventas_filtradas = df_ventas[
-            ~df_ventas['cliente'].isin(['ACADEMIA AMATEUR', 'ACADEMIA PRO']) # Cambiado a 'cliente'
+            ~df_ventas['cliente'].isin(['academia amateur', 'academia pro']) # Ahora 'academia amateur' y 'academia pro'
         ].copy()
     else:
-        # Convertir 'cancelado' a string para manejar posibles variaciones (e.g., espacios)
-        df_ventas['cancelado'] = df_ventas['cancelado'].astype(str).str.upper().str.strip() # Cambiado a 'cancelado'
+        df_ventas['cancelado'] = df_ventas['cancelado'].astype(str).str.upper().str.strip()
         df_ventas_filtradas = df_ventas[
-            ~df_ventas['cliente'].isin(['ACADEMIA AMATEUR', 'ACADEMIA PRO']) & # Cambiado a 'cliente'
-            (df_ventas['cancelado'] != 'SI') # Cambiado a 'cancelado'
+            ~df_ventas['cliente'].isin(['academia amateur', 'academia pro']) &
+            (df_ventas['cancelado'] != 'SI')
         ].copy()
 
-    print("Convirtiendo columnas de fecha a formato estándar...")
-    # Las referencias a 'Fecha' y 'Monto' ahora son 'fecha' y 'monto'
-    df_ventas_filtradas['fecha'] = pd.to_datetime(df_ventas_filtradas['fecha'], errors='coerce')
-    df_banco['fecha'] = pd.to_datetime(df_banco['fecha'], errors='coerce')
+    print("Convirtiendo columnas de fecha y monto a formato estándar...")
+    # --- CAMBIOS CLAVE AQUÍ: Usar los nombres de columna correctos y estandarizados ---
+    # Para ventas: 'fecha pago' y 'monto'
+    # Para banco: 'fecha' y 'importe pesos'
+    
+    # Validar si las columnas existen antes de intentar usarlas
+    if 'fecha pago' not in df_ventas_filtradas.columns:
+        raise ValueError("Columna 'Fecha Pago' no encontrada en el archivo de ventas. Asegúrate de que el nombre sea correcto.")
+    if 'monto' not in df_ventas_filtradas.columns:
+        raise ValueError("Columna 'Monto' no encontrada en el archivo de ventas. Asegúrate de que el nombre sea correcto.")
+    if 'fecha' not in df_banco.columns:
+        raise ValueError("Columna 'Fecha' no encontrada en el archivo bancario. Asegúrate de que el nombre sea correcto.")
+    if 'importe pesos' not in df_banco.columns:
+        raise ValueError("Columna 'Importe Pesos' no encontrada en el archivo bancario. Asegúrate de que el nombre sea correcto.")
 
-    df_ventas_filtradas.dropna(subset=['fecha'], inplace=True)
-    df_banco.dropna(subset=['fecha'], inplace=True)
 
-    df_ventas_filtradas['monto'] = pd.to_numeric(df_ventas_filtradas['monto'], errors='coerce')
-    df_banco['monto'] = pd.to_numeric(df_banco['monto'], errors='coerce')
+    df_ventas_filtradas['fecha_estandar'] = pd.to_datetime(df_ventas_filtradas['fecha pago'], errors='coerce')
+    df_banco['fecha_estandar'] = pd.to_datetime(df_banco['fecha'], errors='coerce')
 
-    df_ventas_filtradas.dropna(subset=['monto'], inplace=True)
-    df_banco.dropna(subset=['monto'], inplace=True)
+    df_ventas_filtradas.dropna(subset=['fecha_estandar'], inplace=True)
+    df_banco.dropna(subset=['fecha_estandar'], inplace=True)
+
+    df_ventas_filtradas['monto_estandar'] = pd.to_numeric(df_ventas_filtradas['monto'], errors='coerce')
+    df_banco['monto_estandar'] = pd.to_numeric(df_banco['importe pesos'], errors='coerce') # CAMBIO IMPORTANTE AQUÍ
+
+    df_ventas_filtradas.dropna(subset=['monto_estandar'], inplace=True)
+    df_banco.dropna(subset=['monto_estandar'], inplace=True)
 
     print("Iniciando el proceso de conciliación con tolerancia de 24 horas...")
     df_ventas_filtradas['Conciliado'] = False
@@ -68,13 +77,13 @@ def conciliar_ventas_banco(df_ventas, df_banco):
     conciliaciones = []
 
     for idx_venta, row_venta in df_ventas_filtradas.iterrows():
-        fecha_min = row_venta['fecha'] - timedelta(days=1) # Cambiado a 'fecha'
-        fecha_max = row_venta['fecha'] + timedelta(days=1) # Cambiado a 'fecha'
+        fecha_min = row_venta['fecha_estandar'] - timedelta(days=1)
+        fecha_max = row_venta['fecha_estandar'] + timedelta(days=1)
 
         match_banco = df_banco[
-            (df_banco['fecha'] >= fecha_min) & # Cambiado a 'fecha'
-            (df_banco['fecha'] <= fecha_max) & # Cambiado a 'fecha'
-            (df_banco['monto'] == row_venta['monto']) & # Cambiado a 'monto'
+            (df_banco['fecha_estandar'] >= fecha_min) &
+            (df_banco['fecha_estandar'] <= fecha_max) &
+            (df_banco['monto_estandar'] == row_venta['monto_estandar']) & # CAMBIO IMPORTANTE AQUÍ
             (~df_banco['Conciliado'])
         ]
 
@@ -83,13 +92,13 @@ def conciliar_ventas_banco(df_ventas, df_banco):
             df_ventas_filtradas.loc[idx_venta, 'Conciliado'] = True
             df_banco.loc[idx_banco, 'Conciliado'] = True
             conciliaciones.append({
-                'Fecha_Venta': row_venta['fecha'].strftime('%Y-%m-%d'), # Cambiado a 'fecha'
-                'Monto_Venta': row_venta['monto'], # Cambiado a 'monto'
-                'Cliente_Venta': row_venta.get('cliente', 'N/A'), # Cambiado a 'cliente'
-                'Detalle_Venta': row_venta.get('detalle', 'N/A'), # Asumiendo 'detalle' en minúscula
-                'Fecha_Banco': df_banco.loc[idx_banco, 'fecha'].strftime('%Y-%m-%d'), # Cambiado a 'fecha'
-                'Monto_Banco': df_banco.loc[idx_banco, 'monto'], # Cambiado a 'monto'
-                'Concepto_Banco': df_banco.loc[idx_banco].get('concepto', 'N/A') # Asumiendo 'concepto' en minúscula
+                'Fecha_Venta': row_venta['fecha_estandar'].strftime('%Y-%m-%d'),
+                'Monto_Venta': row_venta['monto_estandar'],
+                'Cliente_Venta': row_venta.get('cliente', 'N/A'),
+                'Detalle_Venta': row_venta.get('detalle', 'N/A'), # 'detalle' no estaba en la lista de columnas, pero es una suposición segura.
+                'Fecha_Banco': df_banco.loc[idx_banco, 'fecha_estandar'].strftime('%Y-%m-%d'),
+                'Monto_Banco': df_banco.loc[idx_banco, 'monto_estandar'],
+                'Concepto_Banco': df_banco.loc[idx_banco].get('concepto', 'N/A') # 'concepto' en minúscula
             })
 
     df_conciliado = pd.DataFrame(conciliaciones)
@@ -120,9 +129,9 @@ def index():
             banco_file.save(banco_filepath)
 
             try:
-                # Carga de CSVs (las columnas se estandarizan dentro de conciliar_ventas_banco)
+                # --- CAMBIO IMPORTANTE AQUÍ: Especificar 'header=7' para el archivo bancario ---
                 df_ventas = pd.read_csv(ventas_filepath)
-                df_banco = pd.read_csv(banco_filepath)
+                df_banco = pd.read_csv(banco_filepath, header=7) # <-- CAMBIO CLAVE AQUÍ
 
                 df_conciliado, df_ventas_no_conciliadas, df_banco_no_conciliado = conciliar_ventas_banco(df_ventas, df_banco)
 
